@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="author" content="Joaquim Pedro de Morais Filho">
+    <meta name="description" content="02quest Vault - Banco de dados ultra-denso com criptografia AES-256 e compressão GZIP">
+    <meta name="keywords" content="vault, database, encryption, AES-256, GZIP, compressed database">
+    <title>02quest Vault v4.1 | Ultra-Density DB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔐</text></svg>">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'JetBrains Mono', monospace; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        @keyframes shield-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+        .secure-pulse { animation: shield-pulse 2s infinite; }
+
+        .modal-enter { animation: modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes modalIn {
+            from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+            to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
+
+        .tech-grid {
+            background-image: radial-gradient(#e2e8f0 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden selection:bg-emerald-100 selection:text-emerald-900 tech-grid">
+
+    <!-- Header -->
+    <header class="bg-white/90 backdrop-blur-md border-b border-slate-200 h-16 flex items-center justify-between px-6 shadow-sm z-20">
+        <div class="flex items-center gap-4">
+            <div id="security-badge" class="bg-slate-800 p-2 rounded-lg shadow-lg transition-colors duration-500">
+                <i data-lucide="cpu" class="text-white w-5 h-5"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-xl tracking-tight text-slate-900 leading-tight">02quest <span class="text-emerald-600">Vault v4</span></h1>
+                <div class="flex items-center gap-2">
+                    <span id="storage-indicator" class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                    <p id="storage-text" class="text-[10px] text-slate-500 font-mono tracking-wider uppercase">Ultra-Density Active</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-3">
+            <div class="hidden md:flex flex-col items-end mr-4">
+                <span class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Capacidade Otimizada</span>
+                <span id="capacity-readout" class="text-xs font-mono font-bold text-slate-700">0 / 2000+</span>
+            </div>
+
+            <button onclick="createNewVault()" class="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-md text-xs font-bold transition-all border border-emerald-200" title="Iniciar um novo banco de dados vazio">
+                <i data-lucide="plus-circle" class="w-3 h-3"></i>
+                NOVO (+)
+            </button>
+
+            <button onclick="toggleInfoModal()" class="flex items-center gap-2 px-3 py-1.5 hover:bg-slate-100 text-slate-500 hover:text-blue-600 rounded-md text-xs font-bold transition-all">
+                <i data-lucide="info" class="w-3 h-3"></i>
+                INFO V4
+            </button>
+
+            <div class="h-6 w-px bg-slate-200 mx-1"></div>
+
+            <button onclick="toggleEncryptionModal()" id="lock-btn" class="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md text-xs font-bold transition-all border border-slate-200 shadow-sm">
+                <i data-lucide="lock" class="w-3 h-3"></i>
+                <span id="lock-btn-text">CRIPTOGRAFAR</span>
+            </button>
+            
+            <button onclick="resetDatabase()" class="p-2 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all" title="Limpar Tudo (Reset Total)">
+                <i data-lucide="trash-2" class="w-5 h-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden relative">
+        
+        <!-- Sidebar (Inserter) -->
+        <aside class="w-80 bg-white border-r border-slate-200 flex flex-col z-10 shadow-xl">
+            <div class="p-5 border-b border-slate-100 bg-slate-50/50">
+                <div class="flex items-center gap-2 mb-1 text-emerald-600">
+                    <i data-lucide="database-zap" class="w-4 h-4"></i>
+                    <h2 class="text-xs font-bold uppercase tracking-wider">Novo Registro</h2>
+                </div>
+                <p class="text-[10px] text-slate-400">Dados compactados via Base36/GZIP.</p>
+            </div>
+
+            <div class="p-5 flex-1 overflow-y-auto bg-white">
+                <form id="insert-form" class="space-y-4" onsubmit="event.preventDefault(); insertRow();">
+                    
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase font-mono flex justify-between mb-1">
+                            Nome
+                        </label>
+                        <div class="relative group">
+                            <i data-lucide="user" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                            <input id="input-nome" type="text" maxlength="80" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                placeholder="Nome completo...">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase font-mono flex justify-between mb-1">
+                            Telefone
+                        </label>
+                        <div class="relative group">
+                            <i data-lucide="smartphone" class="absolute left-3 top-2.5 w-4 h-4 text-slate-400 group-focus-within:text-emerald-500 transition-colors"></i>
+                            <input id="input-telefone" type="tel" maxlength="20" required
+                                class="w-full bg-slate-50 border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
+                                placeholder="(00) 00000-0000">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold text-slate-500 uppercase font-mono flex justify-between mb-1">
+                            Assunto
+                        </label>
+                        <textarea id="input-assunto" maxlength="200" rows="3" required
+                            class="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all resize-none"
+                            placeholder="Descreva o assunto..."></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-emerald-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2 group">
+                        <i data-lucide="save" class="w-4 h-4 group-hover:scale-110 transition-transform"></i>
+                        <span>Salvar (Otimizado)</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="p-4 border-t border-slate-200 bg-slate-50 text-center">
+                <p class="text-[10px] text-slate-400 font-medium tracking-wide">ARQUITETURA V4.0</p>
+                <p class="text-xs text-slate-700 font-bold mt-0.5">Joaquim Pedro de Morais Filho</p>
+            </div>
+        </aside>
+
+        <!-- Main Area -->
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-100/50">
+            
+            <div class="bg-white border-b border-slate-200 p-4 sticky top-0 z-10 shadow-sm">
+                <div class="flex items-center gap-3 mb-2">
+                    <span id="protocol-badge" class="bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-black px-2 py-1 rounded tracking-wide cursor-help" title="Protocolo de Alta Densidade">V4-DENSE</span>
+                    <div class="flex-1 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 font-mono p-2 truncate select-all cursor-text relative group" id="api-url-display">
+                        <span class="opacity-50">Inicializando V4 engine...</span>
+                    </div>
+                    <button onclick="copyUrl()" class="text-white bg-emerald-600 hover:bg-emerald-700 text-xs font-bold px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-md shadow-emerald-500/20 active:translate-y-0.5">
+                        <i data-lucide="link" class="w-3 h-3"></i>
+                        COPIAR LINK
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <div class="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-100">
+                        <div id="capacity-bar" class="h-full bg-emerald-500 w-0 transition-all duration-700 ease-out"></div>
+                    </div>
+                    <span id="capacity-text" class="text-[10px] text-slate-400 font-mono whitespace-nowrap min-w-[120px] text-right">0 bytes</span>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-hidden flex flex-col p-6 lg:p-8">
+                
+                <div class="mb-6 flex gap-4">
+                    <div class="relative flex-1">
+                        <i data-lucide="search" class="absolute left-4 top-3.5 w-5 h-5 text-slate-400"></i>
+                        <input type="text" id="search-input" onkeyup="handleSearch()" 
+                            placeholder="Busca vetorial inteligente..." 
+                            class="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 shadow-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all bg-white">
+                    </div>
+                    <div class="bg-white rounded-xl border border-slate-200 flex items-center px-4 shadow-sm">
+                        <span class="text-xs text-slate-400 font-bold mr-2">PAGINA:</span>
+                        <select id="page-select" onchange="changePage(this.value)" class="text-sm font-bold text-slate-700 bg-transparent outline-none cursor-pointer">
+                            <option value="1">1</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-white">
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                            <i data-lucide="table" class="w-4 h-4 text-emerald-600"></i> Base de Dados (V4)
+                        </h3>
+                        <div class="flex gap-2">
+                             <span id="filtered-count" class="hidden text-[10px] bg-yellow-50 text-yellow-600 px-2.5 py-1 rounded-full font-bold border border-yellow-200">Filtro Ativo</span>
+                             <span id="total-badge" class="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-mono border border-slate-200">0 itens</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex-1 overflow-auto relative">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-xs uppercase text-slate-500 font-semibold sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-6 py-3 border-b border-slate-200 w-1/4">Nome</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 w-1/5">Telefone</th>
+                                    <th class="px-6 py-3 border-b border-slate-200">Assunto</th>
+                                    <th class="px-6 py-3 border-b border-slate-200 text-right w-20">#</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm divide-y divide-slate-100" id="table-body">
+                            </tbody>
+                        </table>
+                        
+                        <div id="empty-state" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 pointer-events-none">
+                            <i data-lucide="layers" class="w-12 h-12 mb-3 opacity-50"></i>
+                            <p class="text-sm font-medium">Base de dados vazia</p>
+                            <p class="text-xs">Inicie o armazenamento otimizado</p>
+                        </div>
+                    </div>
+
+                    <div class="p-3 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+                        <button onclick="prevPage()" class="p-2 hover:bg-white rounded-lg disabled:opacity-30 transition-all border border-transparent hover:border-slate-200 shadow-sm disabled:shadow-none">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                        </button>
+                        <span id="page-info" class="text-xs font-mono text-slate-500">Pagina 1 de 1</span>
+                        <button onclick="nextPage()" class="p-2 hover:bg-white rounded-lg disabled:opacity-30 transition-all border border-transparent hover:border-slate-200 shadow-sm disabled:shadow-none">
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: INFO & EXPLANATION -->
+    <div id="info-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleInfoModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-3xl h-auto max-h-[90vh] modal-enter flex flex-col">
+            <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-full">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900">Tecnologia V4.0 (Ultra-Density)</h2>
+                        <p class="text-xs text-slate-500">Inteligencia Logica de Compressao</p>
+                    </div>
+                    <button onclick="toggleInfoModal()" class="p-2 hover:bg-slate-200 rounded-full"><i data-lucide="x" class="w-5 h-5 text-slate-500"></i></button>
+                </div>
+                <div class="p-8 overflow-y-auto custom-scrollbar">
+                    <div class="grid grid-cols-1 gap-6">
+                        <div class="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                            <h3 class="font-bold text-blue-900 mb-2 flex items-center gap-2">
+                                <i data-lucide="minimize-2" class="w-4 h-4 text-blue-600"></i>
+                                Como aumentamos a capacidade?
+                            </h3>
+                            <p class="text-sm text-blue-800 leading-relaxed">
+                                Para caber mais dados na URL, aplicamos <strong>Sanitizacao Inteligente</strong> antes de salvar:
+                                <ul class="list-disc ml-5 mt-2 space-y-1 text-xs">
+                                    <li><strong>Telefones:</strong> Removemos <code>( ) -</code> e espacos. Salvamos apenas os digitos brutos. O formato visual e reconstruido apenas na leitura. (Economia: ~4 bytes/registro).</li>
+                                    <li><strong>IDs:</strong> Convertemos timestamps gigantes em <strong>Base36</strong> (ex: <code>171562...</code> vira <code>lww6j4p9</code>). (Economia: ~5 bytes/registro).</li>
+                                    <li><strong>Estrutura:</strong> Mantemos Arrays JSON que sao altamente compressiveis pelo GZIP.</li>
+                                </ul>
+                            </p>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-sm mb-2">Protocolo Hibrido</h4>
+                                <p class="text-xs text-slate-500 leading-relaxed">
+                                    Continuamos salvando uma copia no <strong>LocalStorage</strong> para redundancia. Se a URL atingir o limite fisico dos navegadores, seus dados locais permanecem intactos.
+                                </p>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-sm mb-2">Seguranca AES-256</h4>
+                                <p class="text-xs text-slate-500 leading-relaxed">
+                                    Mesmo com a compressao extra, a criptografia militar continua ativa se voce definir uma senha.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-8 p-4 bg-slate-50 rounded-xl border border-slate-100 text-center">
+                        <p class="text-[10px] text-slate-400 font-mono uppercase tracking-widest mb-1">Created By</p>
+                        <p class="text-sm font-bold text-slate-700">Joaquim Pedro de Morais Filho</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ENCRYPT -->
+    <div id="encrypt-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="toggleEncryptionModal()"></div>
+        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md p-6 modal-enter">
+            <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+                <div class="p-6 text-center border-b border-slate-100 bg-slate-50">
+                    <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 mb-3">
+                        <i data-lucide="shield-check" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-slate-900">Protecao Militar (AES-256)</h3>
+                    <p class="text-xs text-slate-500 mt-1">Criptografa dados ja compactados.</p>
+                </div>
+                <div class="p-6 space-y-4">
+                    <input type="password" id="encrypt-password" placeholder="Defina sua senha mestra" 
+                        class="w-full bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-mono text-sm text-center tracking-widest">
+                    <button onclick="enableEncryption()" class="w-full bg-slate-900 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg transition-all shadow-lg">
+                        BLOQUEAR & GERAR URL V4
+                    </button>
+                    <p class="text-[10px] text-center text-slate-400">Nota: O banco de dados local permanece desbloqueado nesta maquina.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: DECRYPT -->
+    <div id="decrypt-modal" class="fixed inset-0 z-50 hidden bg-slate-900 flex items-center justify-center">
+        <div class="max-w-md w-full p-6 text-center">
+            <div class="mb-8 animate-pulse">
+                <i data-lucide="lock" class="w-16 h-16 text-emerald-500 mx-auto"></i>
+            </div>
+            <h2 class="text-2xl font-bold text-white mb-2">Dados Protegidos</h2>
+            <p class="text-slate-400 text-sm mb-8 font-mono">Joaquim Pedro de Morais Filho | Secure Vault V4</p>
+            
+            <div class="space-y-4">
+                <input type="password" id="decrypt-password" placeholder="Senha de Acesso" 
+                    class="w-full bg-slate-800 border border-slate-700 text-white rounded-xl px-4 py-4 outline-none focus:border-emerald-500 font-mono text-center text-lg placeholder:text-slate-600 tracking-widest">
+                
+                <button onclick="attemptDecrypt()" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-xl transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                    DESCRIPTOGRAFAR
+                </button>
+            </div>
+            <p id="decrypt-error" class="text-red-400 text-xs mt-4 hidden font-mono">Senha Incorreta.</p>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        let dbData = []; 
+        let currentPassword = null;
+        let isEncrypted = false;
+        
+        const ITEMS_PER_PAGE = 10;
+        let currentPage = 1;
+        let filteredData = null; 
+
+        const URL_WARNING_LIMIT = 2500; 
+        const URL_HARD_LIMIT = 30000;   
+
+        const Packer = {
+            pack: (data) => {
+                return data.map(row => [
+                    row[0].toString(36),
+                    row[1],
+                    row[2].replace(/\D/g, ''),
+                    row[3]
+                ]);
+            },
+            unpack: (packedData) => {
+                return packedData.map(row => [
+                    parseInt(row[0], 36),
+                    row[1],
+                    formatPhone(row[2]),
+                    row[3]
+                ]);
+            }
+        };
+
+        function formatPhone(val) {
+            if(!val) return '';
+            const v = val.replace(/\D/g, '');
+            if(v.length > 10) return `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7,11)}`;
+            if(v.length > 2) return `(${v.slice(0,2)}) ${v.slice(2)}`;
+            return v;
+        }
+
+        async function generateKey(password, salt) {
+            const enc = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey("raw", enc.encode(password), { name: "PBKDF2" }, false, ["deriveKey"]);
+            return crypto.subtle.deriveKey(
+                { name: "PBKDF2", salt: salt, iterations: 100000, hash: "SHA-256" },
+                keyMaterial, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]
+            );
+        }
+
+        async function compressData(jsonString) {
+            const stream = new Blob([jsonString]).stream().pipeThrough(new CompressionStream('gzip'));
+            return await new Response(stream).arrayBuffer();
+        }
+
+        async function decompressData(buffer) {
+            const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream('gzip'));
+            return await new Response(stream).json();
+        }
+
+        async function encryptData(packedArray, password) {
+            const json = JSON.stringify(packedArray);
+            const compressed = await compressData(json);
+            const salt = crypto.getRandomValues(new Uint8Array(16));
+            const iv = crypto.getRandomValues(new Uint8Array(12));
+            const key = await generateKey(password, salt);
+            const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key, compressed);
+            const packed = new Uint8Array(salt.byteLength + iv.byteLength + encrypted.byteLength);
+            packed.set(salt, 0); packed.set(iv, salt.byteLength); packed.set(new Uint8Array(encrypted), salt.byteLength + iv.byteLength);
+            return "aes:" + arrayBufferToBase64(packed);
+        }
+
+        async function decryptData(base64Str, password) {
+            try {
+                const packed = base64ToArrayBuffer(base64Str.replace("aes:", ""));
+                const salt = packed.slice(0, 16);
+                const iv = packed.slice(16, 28);
+                const ciphertext = packed.slice(28);
+                const key = await generateKey(password, salt);
+                const decryptedCompressed = await crypto.subtle.decrypt({ name: "AES-GCM", iv: iv }, key, ciphertext);
+                const packedArray = await decompressData(decryptedCompressed);
+                return packedArray;
+            } catch (e) { throw new Error("Decryption Failed"); }
+        }
+
+        async function serializeOpenData(packedArray) {
+            const json = JSON.stringify(packedArray);
+            const compressed = await compressData(json); 
+            const bytes = new Uint8Array(compressed);
+            return "v4:" + arrayBufferToBase64(bytes); 
+        }
+
+        async function deserializeOpenData(base64Str) {
+            const cleanStr = base64Str.replace("v4:", "").replace("v3:", "").replace("data:", "");
+            const bytes = base64ToArrayBuffer(cleanStr);
+            return await decompressData(bytes);
+        }
+
+        function arrayBufferToBase64(buffer) {
+            let binary = ''; const bytes = new Uint8Array(buffer);
+            for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+            return btoa(binary);
+        }
+        function base64ToArrayBuffer(base64) {
+            const binary_string = atob(base64); const bytes = new Uint8Array(binary_string.length);
+            for (let i = 0; i < binary_string.length; i++) bytes[i] = binary_string.charCodeAt(i);
+            return bytes.buffer;
+        }
+
+        async function saveState() {
+            const optimizedData = Packer.pack(dbData);
+            localStorage.setItem('02quest_vault_local', JSON.stringify(optimizedData));
+
+            try {
+                let hash = "";
+                if (isEncrypted && currentPassword) {
+                    hash = await encryptData(optimizedData, currentPassword);
+                    updateSecurityUI(true);
+                } else {
+                    hash = await serializeOpenData(optimizedData);
+                    updateSecurityUI(false);
+                }
+                
+                if (hash.length < URL_HARD_LIMIT) {
+                    window.history.replaceState(null, null, '#' + hash);
+                }
+                updateUI(hash.length);
+                refreshView();
+            } catch (e) {
+                console.error("Erro ao processar dados", e);
+                alert("Erro critico de compressao.");
+            }
+        }
+
+        async function loadState() {
+            const hash = window.location.hash.substring(1);
+            
+            if (hash) {
+                if (hash.startsWith("aes:")) {
+                    document.getElementById('decrypt-modal').classList.remove('hidden');
+                    return; 
+                } 
+                
+                try {
+                    let packedData;
+                    if (hash.startsWith("v4:")) {
+                        packedData = await deserializeOpenData(hash);
+                    } else if (hash.startsWith("v3:") || hash.startsWith("data:")) {
+                        const rawOld = await deserializeOpenData(hash);
+                        packedData = Packer.pack(rawOld);
+                        alert("Dados migrados para formato V4 Ultra-Density.");
+                    }
+                    
+                    if(packedData) {
+                        dbData = Packer.unpack(packedData);
+                        updateSecurityUI(false);
+                    } else {
+                        fallbackLocal();
+                    }
+                } catch(e) { console.error(e); fallbackLocal(); }
+                
+            } else {
+                fallbackLocal();
+            }
+            refreshView();
+        }
+
+        function fallbackLocal() {
+            const local = localStorage.getItem('02quest_vault_local');
+            if (local) {
+                try {
+                    const packedLocal = JSON.parse(local);
+                    if (packedLocal.length > 0) {
+                        const sample = packedLocal[0];
+                        if (typeof sample[0] === 'string') {
+                             dbData = Packer.unpack(packedLocal);
+                        } else {
+                             dbData = packedLocal;
+                        }
+                    } else {
+                        dbData = [];
+                    }
+                } catch(e) { dbData = []; }
+            }
+        }
+
+        async function attemptDecrypt() {
+            const pwd = document.getElementById('decrypt-password').value;
+            const hash = window.location.hash.substring(1);
+            try {
+                const packedData = await decryptData(hash, pwd);
+                dbData = Packer.unpack(packedData);
+                
+                currentPassword = pwd;
+                isEncrypted = true;
+                document.getElementById('decrypt-modal').classList.add('hidden');
+                updateSecurityUI(true);
+                refreshView();
+            } catch (e) {
+                console.error(e);
+                document.getElementById('decrypt-error').classList.remove('hidden');
+            }
+        }
+
+        function insertRow() {
+            const nome = document.getElementById('input-nome').value.trim();
+            let telefone = document.getElementById('input-telefone').value.trim();
+            const assunto = document.getElementById('input-assunto').value.trim();
+
+            if (!nome || !telefone || !assunto) return;
+            
+            telefone = formatPhone(telefone);
+
+            dbData.unshift([Date.now(), nome, telefone, assunto]);
+            
+            document.getElementById('input-nome').value = '';
+            document.getElementById('input-telefone').value = '';
+            document.getElementById('input-assunto').value = '';
+            document.getElementById('input-nome').focus();
+            
+            if (filteredData) {
+                document.getElementById('search-input').value = '';
+                filteredData = null;
+            }
+
+            saveState();
+        }
+
+        function deleteRow(id) {
+            if(confirm('Excluir registro permanentemente?')) {
+                dbData = dbData.filter(item => item[0] !== Number(id));
+                
+                if(filteredData) {
+                    filteredData = filteredData.filter(item => item[0] !== Number(id));
+                }
+                
+                if(dbData.length === 0) filteredData = null;
+
+                saveState();
+            }
+        }
+
+        function handleSearch() {
+            const query = document.getElementById('search-input').value.toLowerCase();
+            if (!query) {
+                filteredData = null;
+            } else {
+                filteredData = dbData.filter(item => 
+                    item[1].toLowerCase().includes(query) || 
+                    item[2].includes(query) || 
+                    item[3].toLowerCase().includes(query)
+                );
+            }
+            currentPage = 1; 
+            refreshView();
+        }
+
+        function changePage(pageNum) {
+            currentPage = parseInt(pageNum);
+            refreshView();
+        }
+
+        function nextPage() {
+            const list = filteredData || dbData;
+            const maxPage = Math.ceil(list.length / ITEMS_PER_PAGE);
+            if (currentPage < maxPage) { currentPage++; refreshView(); }
+        }
+
+        function prevPage() {
+            if (currentPage > 1) { currentPage--; refreshView(); }
+        }
+
+        function refreshView() {
+            const list = filteredData || dbData;
+            const totalItems = list.length;
+            const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE) || 1;
+            
+            if (currentPage > totalPages) currentPage = totalPages;
+            if (currentPage < 1) currentPage = 1;
+
+            const start = (currentPage - 1) * ITEMS_PER_PAGE;
+            const end = start + ITEMS_PER_PAGE;
+            const pageItems = list.slice(start, end);
+
+            renderTable(pageItems, start);
+            
+            document.getElementById('total-badge').innerText = `${totalItems} itens`;
+            document.getElementById('capacity-readout').innerText = `${dbData.length} / 2000+`;
+            document.getElementById('page-info').innerText = `Pagina ${currentPage} de ${totalPages}`;
+            
+            const select = document.getElementById('page-select');
+            select.innerHTML = '';
+            for(let i=1; i<=totalPages; i++) {
+                let opt = document.createElement('option');
+                opt.value = i; opt.innerText = i;
+                if(i === currentPage) opt.selected = true;
+                select.appendChild(opt);
+            }
+
+            const filterBadge = document.getElementById('filtered-count');
+            if(filteredData) {
+                filterBadge.classList.remove('hidden');
+                filterBadge.innerText = `Filtro: ${filteredData.length}`;
+            } else {
+                filterBadge.classList.add('hidden');
+            }
+
+            const emptyState = document.getElementById('empty-state');
+            if(totalItems === 0) emptyState.classList.remove('hidden');
+            else emptyState.classList.add('hidden');
+        }
+
+        function renderTable(items, startIndex) {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            items.forEach((row, index) => {
+                let tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors border-b border-slate-50 group fade-in";
+                tr.innerHTML = `
+                    <td class="px-6 py-3 font-medium text-slate-700 truncate max-w-[150px]" title="${row[1]}">${row[1]}</td>
+                    <td class="px-6 py-3 font-mono text-slate-500 text-xs">${row[2]}</td>
+                    <td class="px-6 py-3 text-slate-600 truncate max-w-[200px]" title="${row[3]}">${row[3]}</td>
+                    <td class="px-6 py-3 text-right text-xs text-slate-300 font-mono">
+                        <div class="flex items-center justify-end gap-2">
+                            <span class="mr-2 opacity-0 group-hover:opacity-100 transition-opacity">#${startIndex + index + 1}</span>
+                            <button onclick="deleteRow(${row[0]})" class="text-slate-300 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50">
+                                <i data-lucide="trash" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+            lucide.createIcons();
+        }
+
+        function updateUI(urlLength) {
+            document.getElementById('api-url-display').innerText = window.location.href;
+            
+            const percentage = Math.min((urlLength / URL_WARNING_LIMIT) * 100, 100);
+            const bar = document.getElementById('capacity-bar');
+            const text = document.getElementById('capacity-text');
+            
+            bar.style.width = `${percentage}%`;
+            
+            if (urlLength < URL_WARNING_LIMIT) {
+                bar.className = "h-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.5)]";
+                text.innerText = "URL Otimizada (V4)";
+                text.className = "text-[10px] text-blue-600 font-bold font-mono";
+            } else if (urlLength < URL_HARD_LIMIT) {
+                bar.className = "h-full bg-yellow-500";
+                text.innerText = "Link Denso (Grande)";
+                text.className = "text-[10px] text-yellow-600 font-bold font-mono";
+            } else {
+                bar.className = "h-full bg-red-500 animate-pulse";
+                text.innerText = "Limite Fisico (Local)";
+                text.className = "text-[10px] text-red-600 font-bold font-mono";
+            }
+        }
+
+        function updateSecurityUI(encrypted) {
+            const badge = document.getElementById('security-badge');
+            const proto = document.getElementById('protocol-badge');
+            const lockBtnText = document.getElementById('lock-btn-text');
+            
+            if (encrypted) {
+                badge.className = "bg-emerald-600 p-2 rounded-lg shadow-lg secure-pulse transition-colors duration-500";
+                proto.innerText = "V4-AES256";
+                proto.className = "bg-emerald-100 text-emerald-700 border border-emerald-200 text-[10px] font-black px-2 py-1 rounded tracking-wide";
+                lockBtnText.innerText = "PROTEGIDO";
+            } else {
+                badge.className = "bg-slate-800 p-2 rounded-lg shadow-lg transition-colors duration-500";
+                proto.innerText = "V4-DENSE";
+                proto.className = "bg-blue-50 text-blue-600 border border-blue-100 text-[10px] font-black px-2 py-1 rounded tracking-wide";
+                lockBtnText.innerText = "CRIPTOGRAFAR";
+            }
+        }
+
+        function toggleEncryptionModal() { document.getElementById('encrypt-modal').classList.toggle('hidden'); }
+        function toggleInfoModal() { document.getElementById('info-modal').classList.toggle('hidden'); }
+
+        function enableEncryption() {
+            const pwd = document.getElementById('encrypt-password').value;
+            if (pwd.length < 1) return alert("Senha vazia!");
+            currentPassword = pwd;
+            isEncrypted = true;
+            toggleEncryptionModal();
+            saveState();
+        }
+
+        function copyUrl() {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+                const btn = document.querySelector('button[onclick="copyUrl()"]');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = `<i data-lucide="check" class="w-3 h-3"></i> COPIADO!`;
+                btn.classList.add('bg-slate-800');
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('bg-slate-800');
+                    lucide.createIcons();
+                }, 2000);
+            });
+        }
+
+        function createNewVault() {
+            if(dbData.length > 0) {
+                if(!confirm("Deseja criar um NOVO banco de dados?\n\nO banco atual sera limpo desta tela, mas se voce salvou o link antigo, os dados continuam la.\n\nIsso criara uma 'folha em branco' para um novo link.")) return;
+            }
+            
+            dbData = [];
+            isEncrypted = false;
+            currentPassword = null;
+            filteredData = null;
+            
+            localStorage.removeItem('02quest_vault_local');
+            
+            window.history.pushState(null, null, window.location.pathname);
+            
+            updateSecurityUI(false);
+            refreshView();
+            updateUI(0);
+        }
+
+        function resetDatabase() {
+            if(confirm("ATENCAO: Isso apaga os dados locais e reseta a interface.\n\nTem certeza?")) {
+                dbData = []; isEncrypted = false; currentPassword = null;
+                localStorage.removeItem('02quest_vault_local');
+                window.history.replaceState(null, null, window.location.pathname);
+                updateSecurityUI(false);
+                refreshView();
+                updateUI(0);
+            }
+        }
+
+        window.addEventListener('load', loadState);
+    </script>
+</body>
+</html>
