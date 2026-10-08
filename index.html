@@ -44,6 +44,11 @@
         }
         .fade-in { animation: fadeIn 0.4s ease-out forwards; }
     </style>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#06130D">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen flex flex-col overflow-hidden selection:bg-emerald-100 selection:text-emerald-900 tech-grid">
 
@@ -774,5 +779,6 @@
 
         window.addEventListener('load', loadState);
     </script>
+    <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
 </body>
 </html>
